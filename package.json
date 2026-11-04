@@ -1,0 +1,26 @@
+{
+    "name": "quorchess",
+    "version": "1.0.0",
+    "description": "QuorChess: шахматы с ботами, рейтингом и комнатами",
+    "main": "index.js",
+    "scripts": {
+        "start": "node server/index.js",
+        "vendor": "node scripts/vendor.js",
+        "postinstall": "node scripts/vendor.js"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "AGPL-3.0-or-later",
+    "type": "commonjs",
+    "dependencies": {
+        "@fontsource-variable/onest": "^5.3.1",
+        "@fontsource-variable/unbounded": "^5.3.0",
+        "chess.js": "^1.4.0",
+        "chessground": "^9.2.1",
+        "express": "^5.3.0",
+        "nodemailer": "^10.3.1",
+        "stockfish": "^19.0.1",
+        "three": "^0.187.0",
+        "ws": "^8.22.1"
+    }
+}

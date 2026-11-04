@@ -1,0 +1,22 @@
+[Unit]
+Description=QuorChess
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/quorchess
+EnvironmentFile=/etc/quorchess.env
+ExecStart=/usr/bin/node server/index.js
+Restart=always
+RestartSec=3
+User=quorchess
+Group=quorchess
+# сайт маленький: ограничиваем память и права, чтобы не мешал остальным сервисам на VPS
+MemoryMax=450M
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/quorchess/data
+
+[Install]
+WantedBy=multi-user.target
