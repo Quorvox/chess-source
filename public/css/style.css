@@ -603,3 +603,9 @@ body.skin-min .page-h h1 { font-size: clamp(26px, 3vw, 34px); }
 body.skin-min .mcard { filter: saturate(.5) brightness(.92); border-radius: 16px; }
 body.skin-min .mcard:hover { filter: saturate(.7) brightness(1); }
 body.skin-min .hero-art, body.skin-min .stand { filter: saturate(.7); }
+/* чёрными внизу ряд 8: клетка a8 светлая, значит буквы a, c, e, g тёмные, иначе сливаются с доской */
+.cg-wrap.orientation-black coords.files coord:nth-child(odd) { color: var(--cd); }
+.cg-wrap.orientation-black coords.files coord:nth-child(even) { color: var(--cl); }
+
+#offline-bar { position: fixed; z-index: 90; top: 0; left: 0; right: 0; padding: 8px 14px; background: #3a2a10; color: #ffd9a0; font-size: 14px; text-align: center; border-bottom: 1px solid var(--gold); }
+@media (display-mode: standalone) { body { overscroll-behavior-y: none; } }

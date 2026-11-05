@@ -64,6 +64,10 @@ function run(format, nBots, nHumans, extra = {}) {
   bracket.tick();
   const pr = db.prepare("SELECT * FROM tournament_games WHERE tid = ? AND status = 'wait'").all(tid);
   if (pr.length !== 2) fail('manual pairs ' + pr.length);
+  // сервер перезапустили: пара числится «идёт», а партии в памяти нет, она должна вернуться в ожидание
+  db.prepare("UPDATE tournament_games SET status = 'play', game_id = 'lost' WHERE id = ?").run(pr[1].id);
+  bracket.tick();
+  if (db.prepare('SELECT status FROM tournament_games WHERE id = ?').get(pr[1].id).status !== 'wait') fail('lost game not recovered');
   bracket.setResult(tid, pr[0].id, '1-0');
   bracket.setResult(tid, pr[1].id, '1/2-1/2');
   let threw = false;

@@ -1,6 +1,7 @@
 import { app, go, refreshMe } from '../app.js';
 import { api, esc, avatar } from '../util.js';
 import { openProfileEditor } from '../profileedit.js';
+import { canInstall, install, isInstalled, isIOS, onInstallChange } from '../pwa.js';
 import { t } from '../i18n.js';
 import * as net from '../net.js';
 import { sfx } from '../sound.js';
@@ -56,6 +57,7 @@ export function mount(root) {
     </div>
   </div>
   <div>
+    <div class="panel" id="apppanel"><h2>${t('set.app')}</h2><div id="appbody"></div></div>
   ${u ? `
     <div class="panel"><h2>${t('set.profile')}</h2>
       <div class="head" style="gap:14px">${avatar(u.avatar, 'lg')}<div style="flex:1;min-width:140px"><b style="font-size:18px">${esc(u.display)}</b><div class="muted">@${esc(u.username)}</div></div></div>
@@ -96,7 +98,18 @@ export function mount(root) {
   root.querySelector('#vol').oninput = (e) => setPrefs({ vol: e.target.value / 100 });
   root.querySelector('#vol').onchange = () => sfx.move();
 
-  if (!u) return;
+  const drawApp = () => {
+    const box = root.querySelector('#appbody');
+    if (!box) return;
+    if (isInstalled()) box.innerHTML = `<p class="muted" style="margin:0">✓ ${t('set.app.installed')}</p>`;
+    else if (canInstall()) box.innerHTML = `<p class="muted" style="margin-top:0">${t('set.app.d')}</p><button id="doinstall">${t('set.app.install')}</button>`;
+    else box.innerHTML = `<p class="muted" style="margin:0">${isIOS() ? t('set.app.ios') : t('set.app.how')}</p>`;
+    if (/android/i.test(navigator.userAgent)) box.insertAdjacentHTML('beforeend', `<p style="margin:12px 0 0"><a class="btn ghost" href="/download/QuorChess-1.0.0.apk" download>${t('set.app.apk')}</a></p><p class="muted" style="margin:6px 0 0;font-size:13px">${t('set.app.apk.d')}</p>`);
+    box.querySelector('#doinstall')?.addEventListener('click', () => install());
+  };
+  drawApp();
+  const offApp = onInstallChange(drawApp);
+  if (!u) return offApp;
   root.querySelector('#editprof').onclick = () => openProfileEditor(() => go('/settings', true));
   root.querySelector('#out').onclick = async () => { await api('/logout', { method: 'POST' }); await refreshMe(); net.reconnect(); go('/'); };
   root.querySelector('#del').onclick = async () => {
@@ -106,4 +119,5 @@ export function mount(root) {
     net.reconnect();
     go('/');
   };
+  return offApp;
 }

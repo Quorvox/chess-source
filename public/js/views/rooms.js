@@ -1,5 +1,5 @@
 import { app, go } from '../app.js';
-import { api, esc, avatar, flag, toast } from '../util.js';
+import { api, esc, avatar, flag, toast, badge } from '../util.js';
 import { t } from '../i18n.js';
 import * as net from '../net.js';
 
@@ -46,7 +46,7 @@ export function mount(root) {
     try {
       const { rooms } = await api('/rooms');
       root.querySelector('#rl').innerHTML = rooms.length ? rooms.map((r) =>
-        `<a href="/room/${r.code}" data-link>${avatar(r.host.avatar, 'sm')}<span class="grow"><b>${esc(r.title)}</b><span class="muted">${esc(r.host.display)} ${flag(r.host.country)}, ${r.base}+${r.inc}</span></span><span class="num muted">${r.players}/2</span></a>`).join('')
+        `<a href="/room/${r.code}" data-link>${avatar(r.host.avatar, 'sm')}<span class="grow"><b>${esc(r.title)}</b><span class="muted">${esc(r.host.display)}${badge(r.host.badge)} ${flag(r.host.country)}, ${r.base}+${r.inc}</span></span><span class="num muted">${r.players}/2</span></a>`).join('')
         : `<div class="empty">${t('rooms.none')}</div>`;
     } catch { /* сеть */ }
   }

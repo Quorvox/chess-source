@@ -5,6 +5,7 @@ import { Chess } from '../board.js';
 import { api, toast } from '../util.js';
 import * as net from '../net.js';
 import { t } from '../i18n.js';
+import { openReport } from '../report.js';
 
 function normalize(g) {
   if (g.uci) return g;
@@ -37,6 +38,7 @@ export async function mount(root, { params }) {
     abort: () => net.send({ t: 'abort', id }),
     ...(colorOf(first) && first.status === 'play' ? { emote: (e) => net.send({ t: 'emote', id, e }), chat: (text) => net.send({ t: 'chat', id, text }) } : {}),
     leave: () => go('/'),
+    ...(colorOf(first) ? { report: () => openReport(id) } : {}),
   });
   const warn = (e) => { e.preventDefault(); e.returnValue = t('resume.leave'); };
   const show = (g) => {

@@ -1,0 +1,25 @@
+{
+  "name": "QuorChess",
+  "short_name": "QuorChess",
+  "description": "Шахматы онлайн: рейтинг, боты, турниры, друзья. Игра с ботом работает без интернета.",
+  "lang": "ru",
+  "id": "/",
+  "start_url": "/?source=app",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#1f1e1b",
+  "theme_color": "#1f1e1b",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Играть с ботом", "short_name": "С ботом", "url": "/computer?level=4&color=w", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Рейтинговая партия", "short_name": "Рейтинг", "url": "/play", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Вдвоём на одном экране", "short_name": "Вдвоём", "url": "/local", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

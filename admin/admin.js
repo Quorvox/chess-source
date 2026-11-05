@@ -18,7 +18,7 @@ const ACTIONS = {
   'reset-stats': 'сброс статистики', 'edit-profile': 'правка профиля', delete: 'удаление', 'bot-create': 'новый бот', 'bots-generate': 'генерация ботов',
   'bot-delete': 'удалил бота', 'bots-bulk-delete': 'массовое удаление ботов', 'bots-bulk-hide': 'скрыл ботов', 'bots-bulk-unhide': 'вернул ботов', 'bots-bulk-shift': 'сдвиг рейтинга ботов',
   settings: 'настройки', 'close-room': 'закрыл комнату', award: 'выдал награду', 'revoke-award': 'забрал награду', 'verify-email': 'подтвердил почту',
-  'tournament-create': 'создал турнир', 'tournament-edit': 'изменил турнир', 'backup-create': 'сделал копию базы', 'backup-download': 'скачал копию базы', 'tournament-player': 'правка сетки турнира', 'tournament-cancel': 'отменил турнир', 'game-abort': 'прервал партию',
+  'tournament-create': 'создал турнир', 'tournament-edit': 'изменил турнир', 'report-done': 'принял жалобу', 'report-dismissed': 'отклонил жалобу', 'backup-create': 'сделал копию базы', 'backup-download': 'скачал копию базы', 'tournament-player': 'правка сетки турнира', 'tournament-cancel': 'отменил турнир', 'game-abort': 'прервал партию',
   'tournament-finish': 'завершил турнир', badge: 'галочка', avatar: 'сменил аватар', 'verify-approve': 'одобрил заявку', 'verify-reject': 'отклонил заявку', 'news-add': 'добавил новость', 'news-delete': 'удалил новость',
 };
 const PROVIDER = { password: 'почта', telegram: 'Telegram', discord: 'Discord' };
@@ -71,7 +71,7 @@ export async function mount(root) {
   const st = { q: '', filter: '', sort: '', page: 0 };
   const NAV = [
     ['Главное', [['stats', 'Обзор'], ['games', 'Партии']]],
-    ['Люди', [['users', 'Игроки'], ['verify', 'Заявки'], ['bots', 'Боты']]],
+    ['Люди', [['users', 'Игроки'], ['verify', 'Заявки'], ['reports', 'Жалобы'], ['bots', 'Боты']]],
     ['Игра', [['tourn', 'Турниры'], ['rooms', 'Комнаты']]],
     ['Сайт', [['news', 'Новости'], ['settings', 'Настройки'], ['audit', 'Журнал']]],
   ];
@@ -237,6 +237,27 @@ export async function mount(root) {
       body.querySelector('#flt').onchange = (e) => { st.filter = e.target.value; st.page = 0; load(); };
       body.querySelector('#sort').onchange = (e) => { st.sort = e.target.value; st.page = 0; load(); };
       body.onclick = (e) => { if (openRow(e)) return; const pg = e.target.closest('[data-pg]'); if (pg) { st.page += Number(pg.dataset.pg); load(); } };
+      await load();
+    },
+
+    async reports() {
+      let status = 'new';
+      const REASON_RU = { cheat: 'Читерство', abuse: 'Оскорбления', other: 'Другое' };
+      const load = async () => {
+        const { reports, pending } = await adm('/reports?status=' + status);
+        body.innerHTML = `<div class="tabs sub"><button data-st="new" class="${status === 'new' ? 'on' : ''}">Новые${pending ? ' (' + pending + ')' : ''}</button><button data-st="done" class="${status === 'done' ? 'on' : ''}">Рассмотренные</button></div>
+          <p class="muted" style="margin-top:0">Жалобы из партий. Открой партию и игрока, при необходимости забань или сбрось рейтинг в карточке, потом закрой жалобу.</p>
+          <div class="list panel">${reports.map((r) => `<div class="li" style="align-items:flex-start;flex-wrap:wrap"><span class="grow" style="min-width:240px"><b><span class="tag">${REASON_RU[r.reason]}</span> на <a href="#" data-open="${r.target_id}" style="color:var(--ink)">${esc(r.target)}</a>${r.target_bot ? ' <span class="tag">бот</span>' : ''}${r.target_banned ? ' <span class="tag" style="color:var(--red)">бан</span>' : ''}</b>
+            <span class="muted" style="white-space:normal">Пожаловался ${esc(r.reporter)}, ${dt(r.ts)}. Таких жалоб на игрока: ${r.same_count}.</span>${r.text ? `<span style="white-space:normal;margin-top:4px">${esc(r.text)}</span>` : ''}</span>
+            <span class="row" style="flex-wrap:nowrap"><button class="ghost" data-game="${esc(r.game_id)}">Партия</button>${status === 'new' ? `<button data-done="${r.id}">Принять</button><button class="ghost" data-dis="${r.id}">Отклонить</button>` : `<span class="tag">${esc(r.handled_by)}</span>`}</span></div>`).join('') || '<div class="empty">Жалоб нет.</div>'}</div>`;
+      };
+      body.onclick = async (e) => {
+        if (openRow(e)) return;
+        const st2 = e.target.closest('[data-st]')?.dataset.st; if (st2) { status = st2; return load(); }
+        const gm = e.target.closest('[data-game]')?.dataset.game; if (gm) return openGame(gm);
+        const dn = e.target.closest('[data-done]')?.dataset.done, ds = e.target.closest('[data-dis]')?.dataset.dis;
+        if (dn || ds) { if (await run(() => adm('/reports/' + (dn || ds), { method: 'POST', body: { action: dn ? 'done' : 'dismiss' } }), 'Готово')) load(); }
+      };
       await load();
     },
 

@@ -20,9 +20,14 @@ export async function mount(root) {
       <label for="p">${t('auth.pass')}</label><input id="p" name="password" type="password" autocomplete="current-password" required minlength="8">
       <div id="hint" hidden><p class="muted">${t('auth.hint')}</p>
         <label class="switch" style="align-items:flex-start;border-top:0;padding:6px 0"><span style="font-size:14px">${t('auth.agree1')} <a href="/legal#rules" data-link>${t('auth.agreeTerms')}</a> ${t('auth.agreeAnd')} <a href="/legal#data" data-link>${t('auth.agreePriv')}</a></span><input type="checkbox" id="agree"></label></div>
-      <div class="err" id="err">${q.get('err') === 'banned' ? t('err.banned') : q.get('err') === 'social' ? t('auth.errSocial') : ''}</div>
+      <div class="err" id="err">${q.get('reset') ? t('reset.done') : q.get('err') === 'banned' ? t('err.banned') : q.get('err') === 'social' ? t('auth.errSocial') : ''}</div>
       <button class="big" id="go" style="width:100%;margin-top:6px">${t('auth.login')}</button>
+      <p style="text-align:center;margin:12px 0 0"><a href="#" id="forgot">${t('auth.forgot')}</a></p>
     </form>
+    <form id="ff" hidden style="margin-top:14px"><p class="muted" style="margin-top:0">${t('auth.forgotText')}</p>
+      <input id="fe" type="email" placeholder="email@example.com" required autocomplete="email">
+      <div class="row" style="margin-top:10px"><button>${t('auth.forgotSend')}</button><button type="button" class="ghost" id="fc">${t('cancel')}</button></div>
+      <p class="muted" id="fm" style="margin-bottom:0"></p></form>
     <div class="muted" style="text-align:center;margin:18px 0 10px">${t('auth.or')}</div>
     <div class="row" style="justify-content:center">
       <div id="tg">${cfg.telegram ? '' : `<button class="ghost" disabled>Telegram ${soon}</button>`}</div>
@@ -42,6 +47,19 @@ export async function mount(root) {
     root.querySelector('#tg').append(s);
   }
 
+  const ff = root.querySelector('#ff');
+  root.querySelector('#forgot').onclick = (e) => { e.preventDefault(); ff.hidden = false; root.querySelector('#fe').focus(); };
+  root.querySelector('#fc').onclick = () => { ff.hidden = true; };
+  ff.onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const r = await api('/forgot', { method: 'POST', body: { email: root.querySelector('#fe').value.trim() } });
+      const fm = root.querySelector('#fm');
+      fm.textContent = r.mail ? '✓ ' + t('auth.forgotDone') : t('auth.forgotOff');
+      fm.style.color = r.mail ? 'var(--green)' : 'var(--red)';
+      fm.style.fontWeight = '700';
+    } catch (ex) { root.querySelector('#fm').textContent = ex.message; }
+  };
   const f = root.querySelector('#f');
   root.querySelector('.tabs').onclick = (e) => {
     const b = e.target.closest('button');

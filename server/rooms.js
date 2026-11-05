@@ -81,7 +81,7 @@ function relay(ws, m) {
   }
 }
 
-const pubUser = (u) => ({ username: u.username, display: u.display, rating: Math.round(u.rating), avatar: u.avatar, country: u.country });
+const pubUser = (u) => ({ badge: require('./badge').badgeOf(u), username: u.username, display: u.display, rating: Math.round(u.rating), avatar: u.avatar, country: u.country });
 const info = (r) => ({ code: r.code, title: r.title, base: r.base, inc: r.inc, open: r.open, host: pubUser(r.host.user), players: r.members.size + 1 });
 
 function list() {

@@ -158,7 +158,7 @@ class Game {
 
   // чат в партии: короткие сообщения, бот иногда отвечает своей фразой
   chat(color, text) {
-    text = String(text || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 120);
+    text = require('./filter').clean(String(text || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 120));
     if (!text || this.status !== 'play') return;
     const now = Date.now();
     this.lastChat = this.lastChat || { w: 0, b: 0 };

@@ -300,6 +300,7 @@ export function createGameUI(root, cb) {
     const item = (id, label, cls = '') => `<button class="pm ${cls}" data-m="${id}">${label}</button>`;
     const sw = (k, label) => `<label class="pm sw"><span>${label}</span><input type="checkbox" data-pref="${k}" ${p[k] ? 'checked' : ''}></label>`;
     let h = item('flip', t('ui.flip'));
+    if (cb.report) h += item('report', t('rep.btn'));
     if (playing) {
       if (plies.length < 2) { if (cb.abort) h += item('abort', t('ui.abort')); }
       else {
@@ -320,6 +321,7 @@ export function createGameUI(root, cb) {
   function onMenu(id) {
     closeMenus();
     if (id === 'flip') { flipped = !flipped; render(); }
+    else if (id === 'report') cb.report?.();
     else if (id === 'abort') cb.abort?.();
     else if (id === 'draw') cb.draw?.();
     else if (id === 'resign') { if (confirm(t('ui.confirmResign'))) cb.resign?.(); }

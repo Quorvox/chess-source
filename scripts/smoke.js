@@ -31,7 +31,7 @@ let tgUp = 100;
 const tgSay = (from, text) => tgQueue.push({ update_id: ++tgUp, message: { text, from: { id: from, first_name: 'Tg' + from, username: 'tguser' + from, language_code: 'ru' }, chat: { id: from, type: 'private' } } });
 const tgTap = (from, data) => tgQueue.push({ update_id: ++tgUp, callback_query: { id: 'c' + tgUp, data, from: { id: from, first_name: 'Tg' + from, username: 'tguser' + from, language_code: 'ru' }, message: { chat: { id: from, type: 'private' } } } });
 const srv = spawn(process.execPath, [path.join(__dirname, '..', 'server', 'index.js')], {
-  env: { ...process.env, PORT, DATA_DIR: dataDir, ADMIN_HOST: 'admin.test', TELEGRAM_BOT_TOKEN: 'test:token', TELEGRAM_API: 'http://127.0.0.1:3498', PUBLIC_URL: 'http://localhost:' + PORT }, stdio: 'inherit',
+  env: { ...process.env, PORT, DATA_DIR: dataDir, ADMIN_HOST: 'admin.test', MAIL_OUTBOX: path.join(dataDir, 'outbox.jsonl'), TELEGRAM_BOT_TOKEN: 'test:token', TELEGRAM_API: 'http://127.0.0.1:3498', PUBLIC_URL: 'http://localhost:' + PORT }, stdio: 'inherit',
 });
 const H = { 'content-type': 'application/json', 'x-requested-with': 'qc' };
 const base = 'http://localhost:' + PORT;
@@ -109,6 +109,13 @@ const waitFor = async (msgs, pred, ms = 20000) => {
   // часы считает сервер: при отключённом интернете время идёт, а не стоит
   const clk = live2.running ? live2 : null;
   console.log('anticheat ok, moves', live2.uci.length);
+  // жалоба на соперника из партии: один раз, повтор отклоняется
+  const rep1 = await fetch(base + '/api/report', { method: 'POST', headers: { ...H, cookie: a.cookie }, body: JSON.stringify({ game: st.id, reason: 'cheat', text: 'подозрительно быстрые ходы' }) });
+  if (rep1.status !== 200) fail('report ' + rep1.status);
+  const rep2 = await fetch(base + '/api/report', { method: 'POST', headers: { ...H, cookie: a.cookie }, body: JSON.stringify({ game: st.id, reason: 'abuse' }) });
+  if (rep2.status !== 409) fail('duplicate report allowed');
+  const rep3 = await fetch(base + '/api/report', { method: 'POST', headers: { ...H, cookie: a.cookie }, body: JSON.stringify({ game: 'ffffffffff', reason: 'abuse' }) });
+  if (rep3.status !== 400) fail('report on foreign game allowed');
   // нажал «Играть» посреди партии: сервер возвращает в неё, а не молчит
   a.msgs.length = 0;
   a.ws.send(JSON.stringify({ t: 'seek', base: 5, inc: 0 }));
@@ -284,6 +291,10 @@ const waitFor = async (msgs, pred, ms = 20000) => {
   h.ws.send(JSON.stringify({ t: 'chat', id: sg.id, text: 'привет <b>друг</b>' }));
   const ch = await waitFor(g.msgs, (m) => m.t === 'chat');
   if (ch.text.includes('<')) fail('chat not sanitized');
+  await sleep(1400);
+  h.ws.send(JSON.stringify({ t: 'chat', id: sg.id, text: 'ты сука, fuck you, спасибо за игру' }));
+  const ch2 = await waitFor(g.msgs, (m) => m.t === 'chat' && m.text !== ch.text);
+  if (/сука|fuck/i.test(ch2.text) || !ch2.text.includes('спасибо')) fail('chat filter: ' + ch2.text);
   if ((await (await FR('DELETE', 'guest_t', h)).json()).status !== 'none') fail('friend remove');
 
   // турнир: призы, сетка, правка
@@ -330,6 +341,41 @@ const waitFor = async (msgs, pred, ms = 20000) => {
   if (!String(avp.user.avatar).startsWith('/avatars/' + avUser.id + '.png')) fail('avatar not saved ' + avp.user.avatar);
   if ((await areq('GET', '/avatars/' + avUser.id + '.png')).status !== 200) fail('avatar not served on admin host');
   console.log('admin avatar ok');
+  // приложение: service worker и manifest
+  const swr = await fetch(base + '/sw.js');
+  const swt = await swr.text();
+  if (swr.status !== 200 || !swt.includes('PRECACHE') || !swt.includes('/vendor/stockfish/') || !(swr.headers.get('content-type') || '').includes('javascript')) fail('sw.js');
+  const mf = await (await fetch(base + '/manifest.webmanifest')).json();
+  if (mf.display !== 'standalone' || !mf.icons.some((i) => i.purpose === 'maskable')) fail('manifest');
+  for (const ic of mf.icons) if ((await fetch(base + ic.src)).status !== 200) fail('icon ' + ic.src);
+  // для поисковиков
+  const rob = await (await fetch(base + '/robots.txt')).text();
+  if (!rob.includes('Disallow: /api/') || !rob.includes('Sitemap:')) fail('robots.txt');
+  const sm = await (await fetch(base + '/sitemap.xml')).text();
+  if (!sm.includes('<urlset') || !sm.includes('/leaders')) fail('sitemap.xml');
+  const idx = await (await fetch(base + '/')).text();
+  if (!idx.includes('name="description"') || !idx.includes('QuorChess')) fail('index meta');
+  // жалобы видны в админке
+  const rl = (await AF('GET', '/api/admin/reports')).json;
+  if (rl.pending < 1 || rl.reports[0].reason !== 'cheat') fail('reports in admin');
+  if ((await AF('POST', `/api/admin/reports/${rl.reports[0].id}`, { action: 'done' })).status !== 200) fail('report close');
+  // забыл пароль: письмо, ссылка, новый пароль, старый не работает, ссылка одноразовая
+  const outbox = path.join(dataDir, 'outbox.jsonl');
+  const mails = () => (fs.existsSync(outbox) ? fs.readFileSync(outbox, 'utf8').trim().split(String.fromCharCode(10)).filter(Boolean).map((x) => JSON.parse(x)) : []);
+  const mailsBefore = mails().length;
+  const fg = await fetch(base + '/api/forgot', { method: 'POST', headers: H, body: JSON.stringify({ email: 'nobody@test.local' }) });
+  if (fg.status !== 200 || mails().length !== mailsBefore) fail('forgot unknown email must be silent');
+  const fg2 = await fetch(base + '/api/forgot', { method: 'POST', headers: H, body: JSON.stringify({ email: 'alice_t@test.local' }) });
+  if (fg2.status !== 200) fail('forgot');
+  const mailR = mails().filter((m) => m.subject.includes('новый пароль')).pop();
+  const tokenR = /reset\?token=([a-f0-9]+)/.exec(mailR.text)[1];
+  if ((await fetch(base + '/reset?token=' + tokenR)).status !== 200) fail('reset page');
+  if ((await fetch(base + '/api/reset', { method: 'POST', headers: H, body: JSON.stringify({ token: tokenR, password: 'short' }) })).status !== 400) fail('weak password reset');
+  if ((await fetch(base + '/api/reset', { method: 'POST', headers: H, body: JSON.stringify({ token: tokenR, password: 'brandnewpass1' }) })).status !== 200) fail('reset');
+  if ((await fetch(base + '/api/reset', { method: 'POST', headers: H, body: JSON.stringify({ token: tokenR, password: 'another12345' }) })).status !== 400) fail('reset token reusable');
+  if ((await fetch(base + '/api/login', { method: 'POST', headers: H, body: JSON.stringify({ username: 'alice_t', password: 'password123' }) })).status === 200) fail('old password still works');
+  if ((await fetch(base + '/api/login', { method: 'POST', headers: H, body: JSON.stringify({ username: 'alice_t', password: 'brandnewpass1' }) })).status !== 200) fail('new password login');
+  console.log('password reset + reports ok');
   // резервные копии: создать, увидеть в списке, скачать, чужое имя не отдаётся
   const bk = await AF('POST', '/api/admin/backups', {});
   if (bk.status !== 200) fail('backup create ' + bk.text);

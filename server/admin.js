@@ -329,6 +329,23 @@ module.exports = function adminRouter({ kick, onlineCount, getAdmin }) {
     res.json({ ok: true });
   });
 
+  // ---- жалобы игроков ----
+  r.get('/reports', (req, res) => {
+    const st = req.query.status === 'done' ? 'done' : 'new';
+    const rows = all(`SELECT r.*, t.username AS target, t.display AS target_display, t.is_bot AS target_bot, t.banned AS target_banned, p.username AS reporter,
+      (SELECT COUNT(*) FROM reports x WHERE x.target_id = r.target_id AND x.reason = r.reason) AS same_count
+      FROM reports r JOIN users t ON t.id = r.target_id JOIN users p ON p.id = r.reporter_id WHERE r.status ${st === 'new' ? "= 'new'" : "<> 'new'"} ORDER BY r.ts DESC LIMIT 100`);
+    res.json({ reports: rows, pending: one("SELECT COUNT(*) c FROM reports WHERE status = 'new'").c });
+  });
+  r.post('/reports/:id', (req, res) => {
+    const rp = one('SELECT * FROM reports WHERE id = ?', Number(req.params.id));
+    if (!rp || rp.status !== 'new') return bad(res, 'Жалоба уже рассмотрена');
+    const act = req.body?.action === 'dismiss' ? 'dismissed' : 'done';
+    db.prepare('UPDATE reports SET status = ?, handled_by = ?, handled_ts = ? WHERE id = ?').run(act, req.admin.username, Date.now(), rp.id);
+    audit(req.admin, 'report-' + act, '#' + rp.id, clean(req.body?.note, 120));
+    res.json({ ok: true });
+  });
+
   // ---- резервные копии базы ----
   r.get('/backups', (req, res) => res.json({ backups: backup.list() }));
   r.post('/backups', (req, res) => {

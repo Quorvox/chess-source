@@ -133,6 +133,11 @@ ensureColumn('users', 'draw_offer', 'INTEGER NOT NULL DEFAULT 3');
 ensureColumn('users', 'show_bot', 'INTEGER NOT NULL DEFAULT 0');
 ensureColumn('users', 'always_on', 'INTEGER NOT NULL DEFAULT 0');
 ensureColumn('users', 'consent_at', 'INTEGER NOT NULL DEFAULT 0');
+db.exec(`CREATE TABLE IF NOT EXISTS reports (
+  id INTEGER PRIMARY KEY, reporter_id INTEGER NOT NULL, target_id INTEGER NOT NULL, game_id TEXT NOT NULL, reason TEXT NOT NULL, text TEXT NOT NULL DEFAULT '',
+  ts INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'new', handled_by TEXT NOT NULL DEFAULT '', handled_ts INTEGER NOT NULL DEFAULT 0
+);
+CREATE UNIQUE INDEX IF NOT EXISTS reports_once ON reports(reporter_id, game_id);`);
 db.exec(`CREATE TABLE IF NOT EXISTS friends (a INTEGER NOT NULL, b INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', ts INTEGER NOT NULL, PRIMARY KEY (a, b));
 CREATE INDEX IF NOT EXISTS friends_b ON friends(b);`);
 db.exec(`
@@ -253,6 +258,8 @@ CREATE INDEX IF NOT EXISTS tg_tid ON tournament_games(tid, round);
 CREATE INDEX IF NOT EXISTS tg_game ON tournament_games(game_id);`);
 
 // с этого рейтинга начинают новые игроки (шкала близка к chess.com)
+ensureColumn('email_tokens', 'kind', "TEXT NOT NULL DEFAULT 'verify'");
+
 const START_RATING = 500;
 
 module.exports = { db, DATA, getSetting, setSetting, audit, START_RATING };

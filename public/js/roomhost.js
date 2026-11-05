@@ -126,7 +126,7 @@ export class RoomHost {
 
   // снимок для рассылки (формат такой же, как у серверной партии)
   snapshot() {
-    const pubU = (u) => u && { username: u.username, display: u.display, rating: u.rating, avatar: u.avatar, country: u.country };
+    const pubU = (u) => u && { username: u.username, display: u.display, rating: u.rating, avatar: u.avatar, country: u.country, badge: u.badge };
     const hostU = pubU(this.host), oppU = this.opp ? pubU(this.opp.user) : null;
     const white = this.hostColor === 'w' ? hostU : oppU;
     const black = this.hostColor === 'w' ? oppU : hostU;

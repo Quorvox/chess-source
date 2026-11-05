@@ -200,6 +200,13 @@ function tick() {
   for (const t of list) {
     try {
       if (!t.seeded) { if (now >= t.start_ts) start(t); continue; }
+      // после перезапуска сервера партии в памяти пропадают: доигранную берём из базы, недоигранную создаём заново
+      for (const pr of db.prepare("SELECT * FROM tournament_games WHERE tid = ? AND round = ? AND status = 'play'").all(t.id, t.cur_round)) {
+        if (games.get(pr.game_id)) continue;
+        const done = db.prepare('SELECT result FROM games WHERE id = ?').get(pr.game_id);
+        if (done && done.result) settle(T(t.id), pr, done.result);
+        else db.prepare("UPDATE tournament_games SET status = 'wait', game_id = '' WHERE id = ?").run(pr.id);
+      }
       for (const pr of db.prepare("SELECT * FROM tournament_games WHERE tid = ? AND round = ? AND status IN ('wait')").all(t.id, t.cur_round)) stepPair(T(t.id), pr);
       const cur = T(t.id);
       if (cur.round_done && now - cur.round_done >= (cur.break_sec || 30) * 1000) {

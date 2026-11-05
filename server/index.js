@@ -60,6 +60,7 @@ const ipOf = (req) => (req.ip || '').replace(/^::ffff:/, '');
 const { badgeOf } = require('./badge');
 const tgbot = require('./tgbot');
 const friends = require('./friends');
+const mailtpl = require('./mailtpl');
 const presence = require('./presence');
 const pub = (u) => ({
   bot: u.is_bot && u.show_bot ? true : undefined, online: u.is_bot ? presence.botOnline(u) : isOnline(u.id), badge: badgeOf(u), username: u.username, display: u.display, bio: u.bio, country: u.country, avatar: u.avatar,
@@ -78,10 +79,19 @@ const sha = (t) => crypto.createHash('sha256').update(t).digest('hex');
 async function sendVerification(user) {
   const token = crypto.randomBytes(24).toString('hex');
   db.prepare('INSERT INTO email_tokens (token_hash, user_id, expires) VALUES (?, ?, ?)').run(sha(token), user.id, Date.now() + 48 * 3600000);
+  const url = `${PUBLIC_URL()}/api/verify?token=${token}`;
+  const n = mailtpl.esc(user.username);
   return mailer.sendMail({
     to: user.email,
     subject: 'QuorChess: подтверди почту / confirm your email',
-    text: `Привет, ${user.username}!\nПодтверди почту по ссылке: ${PUBLIC_URL()}/api/verify?token=${token}\n\nHi ${user.username}! Confirm your email: ${PUBLIC_URL()}/api/verify?token=${token}\n`,
+    text: `Привет, ${user.username}!\nПодтверди почту по ссылке: ${url}\n\nHi ${user.username}! Confirm your email: ${url}\n`,
+    html: mailtpl.render({
+      footer: 'QuorChess · шахматы без лишнего шума. Если ты не регистрировался, просто удали это письмо. / If you did not sign up, just delete this email.',
+      blocks: [
+        { title: 'Подтверди почту', text: `Привет, <b>${n}</b>! Осталось нажать кнопку, и почта подтверждена: у ника появится зелёная галочка.`, button: 'Подтвердить почту', url, note: 'Ссылка действует 48 часов.', fallback: 'Если кнопка не нажимается, открой ссылку:' },
+        { title: 'Confirm your email', text: `Hi <b>${n}</b>! Press the button to confirm your address and get the green badge next to your name.`, button: 'Confirm email', url, note: 'The link is valid for 48 hours.', fallback: 'If the button does not work, open this link:' },
+      ],
+    }),
   });
 }
 
@@ -108,8 +118,66 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
+// забыл пароль: письмо со ссылкой на час. Ответ всегда одинаковый, чтобы нельзя было проверять чужие адреса
+app.post('/api/forgot', async (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  if (!auth.rateLimit('forgot:' + ipOf(req), 5, 3600000) || !auth.rateLimit('forgotm:' + email, 3, 3600000)) return res.status(429).json({ code: 'too_many', error: 'too many attempts' });
+  const u = EMAIL_RE.test(email) ? db.prepare("SELECT * FROM users WHERE email = ? AND is_bot = 0 AND banned = 0 AND provider = 'password'").get(email) : null;
+  if (u) {
+    const token = crypto.randomBytes(24).toString('hex');
+    db.prepare("DELETE FROM email_tokens WHERE user_id = ? AND kind = 'reset'").run(u.id);
+    db.prepare("INSERT INTO email_tokens (token_hash, user_id, expires, kind) VALUES (?, ?, ?, 'reset')").run(sha(token), u.id, Date.now() + 3600000);
+    const url = `${PUBLIC_URL()}/reset?token=${token}`;
+    const n = mailtpl.esc(u.username);
+    mailer.sendMail({
+      to: u.email,
+      subject: 'QuorChess: новый пароль / password reset',
+      text: `Привет, ${u.username}!\nЧтобы задать новый пароль, открой ссылку (она действует час):\n${url}\n\nЕсли это был не ты, просто игнорируй письмо.\n\nHi ${u.username}! To set a new password open this link (valid for one hour):\n${url}\n\nIf this was not you, ignore this email.\n`,
+      html: mailtpl.render({
+        footer: 'QuorChess · если ты не просил новый пароль, никуда не нажимай: пароль не изменится. / If you did not ask for a new password, do nothing: it will not change.',
+        blocks: [
+          { title: 'Новый пароль', text: `Привет, <b>${n}</b>! Нажми кнопку и придумай новый пароль для аккаунта.`, button: 'Задать новый пароль', url, note: 'Ссылка действует 1 час и работает один раз.', fallback: 'Если кнопка не нажимается, открой ссылку:' },
+          { title: 'Reset your password', text: `Hi <b>${n}</b>! Press the button to choose a new password for your account.`, button: 'Set a new password', url, note: 'The link is valid for 1 hour and works once.', fallback: 'If the button does not work, open this link:' },
+        ],
+      }),
+    });
+  }
+  res.json({ ok: true, mail: mailer.enabled() });
+});
+
+app.post('/api/reset', async (req, res) => {
+  const { token, password } = req.body || {};
+  if (!auth.rateLimit('reset:' + ipOf(req), 10, 3600000)) return res.status(429).json({ code: 'too_many', error: 'too many attempts' });
+  if (typeof password !== 'string' || password.length < 8 || password.length > 100) return res.status(400).json({ code: 'bad_password', error: 'bad password' });
+  const row = db.prepare("SELECT * FROM email_tokens WHERE token_hash = ? AND expires > ? AND kind = 'reset'").get(sha(String(token || '')), Date.now());
+  if (!row) return res.status(400).json({ code: 'bad_token', error: 'bad token' });
+  const hash = await auth.hashPassword(password);
+  db.prepare('UPDATE users SET pass = ?, email_verified = 1 WHERE id = ?').run(hash, row.user_id);
+  db.prepare('DELETE FROM email_tokens WHERE user_id = ?').run(row.user_id);
+  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(row.user_id); // старые входы закрываем
+  res.json({ ok: true });
+});
+
+// жалоба на соперника из партии
+app.post('/api/report', (req, res) => {
+  const u = me(req);
+  if (!u) return res.status(401).json({ error: 'auth' });
+  if (!auth.rateLimit('report:' + u.id, 10, 3600000)) return res.status(429).json({ code: 'too_many', error: 'too many attempts' });
+  const gid = String(req.body?.game || '').slice(0, 20);
+  const reason = ['cheat', 'abuse', 'other'].includes(req.body?.reason) ? req.body.reason : 'other';
+  const text = String(req.body?.text || '').replace(/[\u0000-\u001f<>]/g, ' ').trim().slice(0, 300);
+  const live = games.get(gid);
+  let target = null;
+  if (live) { const c = live.colorOf(u.id); if (c) target = (c === 'w' ? live.b : live.w).id; }
+  else { const g = db.prepare('SELECT white_id, black_id FROM games WHERE id = ?').get(gid); if (g && (g.white_id === u.id || g.black_id === u.id)) target = g.white_id === u.id ? g.black_id : g.white_id; }
+  if (!target || target === u.id) return res.status(400).json({ code: 'bad_report', error: 'bad report' });
+  try { db.prepare('INSERT INTO reports (reporter_id, target_id, game_id, reason, text, ts) VALUES (?, ?, ?, ?, ?, ?)').run(u.id, target, gid, reason, text, Date.now()); }
+  catch { return res.status(409).json({ code: 'already', error: 'already' }); }
+  res.json({ ok: true });
+});
+
 app.get('/api/verify', (req, res) => {
-  const row = db.prepare('SELECT * FROM email_tokens WHERE token_hash = ? AND expires > ?').get(sha(String(req.query.token || '')), Date.now());
+  const row = db.prepare("SELECT * FROM email_tokens WHERE token_hash = ? AND expires > ? AND kind = 'verify'").get(sha(String(req.query.token || '')), Date.now());
   if (row) {
     db.prepare('UPDATE users SET email_verified = 1 WHERE id = ?').run(row.user_id);
     db.prepare('DELETE FROM email_tokens WHERE token_hash = ?').run(row.token_hash);
@@ -284,9 +352,22 @@ app.get('/api/live', (req, res) => res.json({ games: games.liveList() }));
 app.get('/api/rooms', (req, res) => res.json({ rooms: rooms.list() }));
 
 app.use('/avatars', express.static(path.join(DATA, 'avatars'), { maxAge: '1h' }));
+// service worker: офлайн-режим и обновление кеша после выкладок
+app.get('/sw.js', (req, res) => {
+  res.set({ 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-cache', 'Service-Worker-Allowed': '/' });
+  res.send(require('./sw').build(PUBLIC));
+});
+
 // код и стили всегда сверяем с сервером (ETag), чтобы после обновления не оставался старый файл; картинки и звуки кешируются
 app.use(express.static(PUBLIC, { maxAge: PROD ? '1d' : 0, extensions: ['html'], setHeaders: (res, f) => { if (/\.(js|css|html)$/.test(f)) res.setHeader('Cache-Control', 'no-cache'); } }));
 // любые остальные пути отдаёт одностраничное приложение
+// для поисковиков: что можно индексировать и карта сайта
+app.get('/robots.txt', (req, res) => res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /login\nDisallow: /reset\nDisallow: /settings\nSitemap: ${PUBLIC_URL()}/sitemap.xml\n`));
+app.get('/sitemap.xml', (req, res) => {
+  const pages = [['/', 1], ['/play', 0.9], ['/leaders', 0.7], ['/tournaments', 0.7], ['/train', 0.7], ['/news', 0.5], ['/community', 0.5], ['/legal', 0.3]];
+  res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${pages.map(([p, pr]) => `  <url><loc>${PUBLIC_URL()}${p}</loc><priority>${pr}</priority></url>`).join('\n')}\n</urlset>\n`);
+});
+
 app.get(/^\/(?!api\/|ws).*/, (req, res) => res.sendFile(path.join(PUBLIC, 'index.html')));
 
 // ---- WebSocket ----

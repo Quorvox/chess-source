@@ -11,7 +11,7 @@ export function mount(root, { params }) {
   const code = params[0].toUpperCase();
   if (!app.user) { go('/login?next=/room/' + code, true); return; }
   const u = app.user;
-  const me = { username: u.username, display: u.display, rating: u.rating, avatar: u.avatar, country: u.country };
+  const me = { username: u.username, display: u.display, rating: u.rating, avatar: u.avatar, country: u.country, badge: u.badge };
   const isHost = !!app.hostRoom && app.hostRoom.code === code;
 
   root.innerHTML = `

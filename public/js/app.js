@@ -1,5 +1,6 @@
 import { api, esc, avatar, badge, toast } from './util.js';
 import { tipOfDay } from './tips.js';
+import { initPwa } from './pwa.js';
 import * as net from './net.js';
 import { applyPrefs } from './skins.js';
 import { t, getLang, setLang } from './i18n.js';
@@ -48,7 +49,7 @@ const routes = [
   [/^\/$/, 'home'], [/^\/news$/, 'news'], [/^\/play$/, 'play'], [/^\/train$/, 'train'], [/^\/community$/, 'community'], [/^\/tournaments$/, 'tournaments'], [/^\/tournaments\/(\d+)$/, 'tournament'],
   [/^\/computer$/, 'computer'], [/^\/friends$/, 'friends'], [/^\/local$/, 'local'], [/^\/study\/([a-z0-9-]+)$/, 'study'], [/^\/game\/([a-f0-9]+)$/, 'game'], [/^\/rooms$/, 'rooms'],
   [/^\/room\/([A-Za-z0-9]{6})$/, 'room'], [/^\/u\/([A-Za-z0-9_]+)$/, 'profile'], [/^\/leaders$/, 'leaders'],
-  [/^\/settings$/, 'settings'], [/^\/login$/, 'auth'], [/^\/legal$/, 'legal'],
+  [/^\/settings$/, 'settings'], [/^\/reset$/, 'reset'], [/^\/login$/, 'auth'], [/^\/legal$/, 'legal'],
 ];
 
 const view = document.getElementById('view');
@@ -127,6 +128,9 @@ async function render() {
   const path = location.pathname;
   let name = null, params = [];
   for (const [re, n] of routes) { const m = re.exec(path); if (m) { name = n; params = m.slice(1); break; } }
+  const TITLE_KEYS = { play: 'nav.play', train: 'nav.train', tournaments: 'nav.tourn', tournament: 'nav.tourn', leaders: 'nav.top', news: 'nav.news', community: 'nav.community', settings: 'nav.settings', friends: 'nav.myfriends', rooms: 'nav.friends' };
+  if (name && TITLE_KEYS[name]) document.title = t(TITLE_KEYS[name]) + ' | QuorChess';
+  else if (name === 'home') document.title = 'QuorChess: шахматы онлайн с рейтингом, ботами и турнирами';
   renderChrome();
   resumeBar();
   window.scrollTo(0, 0);
@@ -206,6 +210,7 @@ net.on('gone', (m) => { if (m.id === app.active) { app.active = null; resumeBar(
 addEventListener('pointerdown', () => sfx.unlock(), { once: true });
 
 applyPrefs();
+initPwa();
 await refreshMe();
 net.connect();
 render();
