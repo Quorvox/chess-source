@@ -1,0 +1,11 @@
+﻿{
+  "name": "quorchess-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "QuorChess: РѕР±РѕР»РѕС‡РєР° РґР»СЏ Android, РѕС‚РєСЂС‹РІР°РµС‚ СЃР°Р№С‚ chess.quorvox.ru",
+  "devDependencies": {
+    "@capacitor/android": "6.2.2",
+    "@capacitor/cli": "6.2.2",
+    "@capacitor/core": "6.2.2"
+  }
+}

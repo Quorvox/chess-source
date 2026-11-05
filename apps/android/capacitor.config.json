@@ -1,0 +1,12 @@
+﻿{
+  "appId": "com.quorvox.quorchess",
+  "appName": "QuorChess",
+  "webDir": "www",
+  "backgroundColor": "#1f1e1b",
+  "server": {
+    "url": "https://chess.quorvox.ru",
+    "androidScheme": "https",
+    "errorPath": "offline.html"
+  },
+  "android": { "allowMixedContent": false }
+}

@@ -81,6 +81,10 @@ scripts/          проверки, нагрузочный тест, копии 
 
 Копии делаются через `VACUUM INTO`: простое копирование файла базы в режиме WAL даёт пустую копию.
 
+## Приложения
+
+Готовые файлы для Android (APK) и Windows (zip с QuorChess.exe) лежат в разделе [Releases](https://github.com/Quorvox/chess-source/releases). Их исходники, обе оболочки над сайтом, в папке `apps/`. Сайт также ставится как приложение из браузера (PWA) на телефон и компьютер, в том числе на iPhone.
+
 ## Лицензия и авторы
 
 Проект открыт по лицензии **AGPL-3.0-or-later** (см. `LICENSE`). Использованы открытые работы: chessground (GPL-3.0), Stockfish (GPL-3.0), chess.js (BSD-2-Clause), звуки и наборы фигур Lichess (AGPL и другие свободные лицензии, подробности в `public/pieces/CREDITS.md` и `public/sounds/lichess-sfx/CREDITS.md`), flag-icons (MIT), шрифт Onest (OFL). Автор: Quorvox_team.

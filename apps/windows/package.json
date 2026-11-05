@@ -1,0 +1,14 @@
+{
+  "name": "quorchess-desktop",
+  "productName": "QuorChess",
+  "version": "1.0.0",
+  "description": "QuorChess для Windows: окно, которое открывает chess.quorvox.ru",
+  "main": "main.js",
+  "private": true,
+  "author": "Quorvox_team",
+  "license": "AGPL-3.0-or-later",
+  "devDependencies": {
+    "electron": "33.2.1",
+    "@electron/packager": "18.3.6"
+  }
+}
